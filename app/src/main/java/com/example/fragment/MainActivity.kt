@@ -10,6 +10,7 @@ import com.example.fragment.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
 
     private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
+    var likedItems: ArrayList<SearchImage> = ArrayList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,7 +25,7 @@ class MainActivity : AppCompatActivity() {
             storeBtn.setOnClickListener {
                 setFragment(Store_Fragment())
             }
-        }
+    }
     }
 
     private fun setFragment(frag: Fragment) {
@@ -33,5 +34,16 @@ class MainActivity : AppCompatActivity() {
             setReorderingAllowed(true)
             addToBackStack("")
         }
+    }
+
+
+    fun addLikedItem(item: SearchImage) {
+        if (!likedItems.contains(item)) {
+            likedItems.add(item)
+        }
+    }
+
+    fun removeLikedItem(item: SearchImage) {
+        likedItems.remove(item)
     }
 }
