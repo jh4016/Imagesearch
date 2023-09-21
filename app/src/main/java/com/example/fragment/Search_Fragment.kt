@@ -1,59 +1,92 @@
 package com.example.fragment
 
+import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
+import com.example.fragment.databinding.FragmentSearchBinding
+import com.example.fragment.retrofit_client.apiService
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
-
-/**
- * A simple [Fragment] subclass.
- * Use the [Store_Fragment.newInstance] factory method to
- * create an instance of this fragment.
- */
 class Search_Fragment : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
+    private lateinit var binding: FragmentSearchBinding
+    private lateinit var mContext: Context
+    private lateinit var adapter: SearchAdapter
+    private lateinit var gridmanager: StaggeredGridLayoutManager
+    private var resItems: ArrayList<SearchImage> = ArrayList()
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        mContext = context
     }
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_store_, container, false)
+    ): View {
+        binding = FragmentSearchBinding.inflate(inflater, container, false)
+        setupViews()   // 뷰 초기 설정
+        setupListeners() // 리스너 설정
+        return binding.root
+    }
+    private fun setupViews() {
+        // RecyclerView 설정
+        gridmanager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+        binding.recyclerView.layoutManager = gridmanager
+
+        adapter = SearchAdapter(mContext)
+        binding.recyclerView.adapter = adapter
+        binding.recyclerView.itemAnimator = null
+
+        // 최근 검색어를 가져와 EditText에 설정
+        val lastSearch = API.getLastSearch(requireContext())
+        binding.searchEditText.setText(lastSearch)
     }
 
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment Store_Fragment.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            Store_Fragment().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
-                }
+    private fun setupListeners() {
+        val imm = requireActivity().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        binding.searchButton.setOnClickListener {
+            val query = binding.searchEditText.text.toString()
+            if (query.isNotEmpty()) {
+                API.saveLastSearch(requireContext(), query)
+                adapter.clearItem()
+                fetchImageResults(query)
+            } else {
+                Toast.makeText(mContext, "검색어를 입력해 주세요.", Toast.LENGTH_SHORT).show()
             }
+
+            // 키보드 숨기기
+            imm.hideSoftInputFromWindow(binding.searchEditText.windowToken, 0)
+        }
+    }
+    private fun fetchImageResults(query: String) {
+        apiService.image_search(API.HEADER, query, "recency", 1, 80)
+            ?.enqueue(object : Callback<ImageModel?> {
+                override fun onResponse(call: Call<ImageModel?>, response: Response<ImageModel?>) {
+                    response.body()?.meta?.let { meta ->
+                        if (meta.totalCount > 0) {
+                            response.body()!!.documents.forEach { document ->
+                                val title = document.displaySitename
+                                val datetime = document.datetime
+                                val url = document.thumbnailUrl
+                                resItems.add(SearchImage(title, datetime, url))
+                            }
+                        }
+                    }
+                    adapter.items = resItems
+                    adapter.notifyDataSetChanged()
+                }
+
+                override fun onFailure(call: Call<ImageModel?>, t: Throwable) {
+                    Log.e("#jblee", "onFailure: ${t.message}")
+                }
+            })
     }
 }
